@@ -1,18 +1,14 @@
 import os
-import sqlite3
-import pandas as pd
 import streamlit as st
 import speech_recognition as sr
 from gtts import gTTS
 from langdetect import detect, LangDetectException
-from indic import transliterate_text
 from infoai import Gen_Ai
 
 # Set page configuration
 st.set_page_config(
     page_title="InfoBot",
     layout="wide",
-    
     initial_sidebar_state="expanded",
     page_icon="🤖"
 )
@@ -22,45 +18,46 @@ st.markdown(
     """
     <style>
     .stApp {
-        background-color: #001f3f; /* Navy blue background */
-        color: white; /* White text */
+        background-color: #001f3f;
+        color: white;
+    }
+    .right-toolbar {
+        position: fixed;
+        top: 50%;
+        right: 20px;
+        transform: translateY(-50%);
         display: flex;
         flex-direction: column;
-        height: 100vh;
+        gap: 15px;
     }
-    .css-1d391kg { /* Chat bubble styling */
-        background-color: #001f3f;
-        color: white;
-    }
-    .css-184tjsw p { /* Chat text styling */
-        color: white;
-    }
-    .stButton button {
-        background-color: #ffffff;
+    .right-toolbar button {
+        background-color: white;
         color: #001f3f;
-        border-radius: 5px; 
+        padding: 10px;
+        border: none;
+        border-radius: 50%;
+        cursor: pointer;
+    }
+    .icon-container {
         display: flex;
-        justify-content: flex-end; /* Aligns content to the right */
-        padding: 10px;
+        justify-content: space-around;
+        margin-top: 10px;
     }
-    .footer {
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        width: 100%;
-        text-align: center;
+    .icon-button {
+        background-color: white;
+        color: #001f3f;
+        border: none;
+        border-radius: 50%;
         padding: 10px;
-        background-color: #001f3f;
-        color: white;
-    }
-    .title{
-        text-align: center;
+        cursor: pointer;
+        font-size: 18px;
     }
     </style>
     """,
     unsafe_allow_html=True
 )
 
+# Function to play audio using gTTS
 def play_audio(text, lang='en'):
     try:
         tts = gTTS(text=text, lang=lang)
@@ -75,6 +72,7 @@ def play_audio(text, lang='en'):
     except Exception as e:
         st.error(f"Error generating audio: {e}")
 
+# Detect the language of input text
 def detect_language(text):
     try:
         return detect(text)
@@ -84,25 +82,28 @@ def detect_language(text):
         st.error(f"Error detecting language: {e}")
         return 'en'
 
+# Main function
 def main():
     st.title("InfoBot 🤖")
 
-    # # Sidebar for uploading CSV files
-    # with st.sidebar:
-    #     st.subheader("Upload CSV Files")
-    #     uploaded_files = st.file_uploader("Upload CSV files", accept_multiple_files=True)
-    #     if uploaded_files:
-    #         for uploaded_file in uploaded_files:
-    #             file_path = os.path(r"C:\Users\ARULMURUGAN M\OneDrive\Desktop\ai\student_details.csv")
-    #             with open(file_path, "wb") as f:
-    #                 f.write(uploaded_file.getbuffer())
-    #         from infocsv import CSV_2_DB
-    #         CSV_2_DB()
-    #         st.write(":green[DB created]")
-
-    # Initialize conversation history
+    # Initialize conversation history and liked messages
     if "conversation" not in st.session_state:
         st.session_state.conversation = []
+    if "liked_messages" not in st.session_state:
+        st.session_state.liked_messages = []
+
+    # Sidebar for CSV file upload
+    with st.sidebar:
+        st.subheader("Upload CSV Files")
+        uploaded_files = st.file_uploader("Upload CSV files", accept_multiple_files=True)
+        if uploaded_files:
+            for uploaded_file in uploaded_files:
+                file_path = os.path.join(r"C:\\Users\\ARULMURUGAN M\\OneDrive\\Desktop\\ai\\demo", uploaded_file.name)
+                with open(file_path, "wb") as f:
+                    f.write(uploaded_file.getbuffer())
+            from infocsv import CSV_2_DB
+            CSV_2_DB()
+            st.write(":green[DB created]")
 
     # Display chat history
     chat_container = st.container()
@@ -110,11 +111,20 @@ def main():
         with chat_container:
             st.markdown(message)
 
-    # Add search bar at the bottom
-    with st.container():
-        user_query = st.text_input("Enter your query", key="query_input", label_visibility="collapsed")
+    # Right toolbar
+    st.markdown(
+        """
+        <div class="right-toolbar">
+            <button title="Community">👥</button>
+            <button title="Likes" onclick="document.getElementById('liked_messages').style.display='block'">❤️</button>
+            <button title="Settings">⚙️</button>
+            <button title="Notifications">🔔</button>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
-    # Button to record voice query
+    # Voice input (🎙️ button)
     if st.button("🎙️"):
         recognizer = sr.Recognizer()
         with sr.Microphone() as source:
@@ -133,23 +143,78 @@ def main():
                 st.error("Sorry, there was an issue with the speech recognition service.")
                 return
     else:
+        user_query = st.text_input("Enter your query", label_visibility="collapsed", key="query_input")
         detected_language = detect_language(user_query) if user_query else 'en'
 
-    # If there is a user query, process it
+    # If user submits the query, process it
     if user_query:
         try:
             # Get response from AI model
             result, _ = Gen_Ai(user_query, detected_language)
             st.session_state.conversation.append(f"**You:** {user_query}")
-            st.session_state.conversation.append(f"**Bot:** {result}")
+            st.session_state.conversation.append(f"**INFOBOT:** {result}")
 
             # Display response
             st.write(f":green[{result}]")
 
-            # Play response audio
-            play_audio(result, lang=detected_language)
+            # Icon buttons under the response
+            st.markdown(
+                f"""
+                <div class="icon-container">
+                    <button class="icon-button" title="Like" id="like_button">👍</button>
+                    <button class="icon-button" title="Save">💾</button>
+                    <button class="icon-button" title="Copy" id="copy_button">📋</button>
+                    <button class="icon-button" title="Read Aloud">🔊</button>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+            # JavaScript for copying response text
+            st.write(f"""
+                <script>
+                document.getElementById("copy_button").addEventListener("click", function() {{
+                    navigator.clipboard.writeText("{result}");
+                    alert("Copied to clipboard!");
+                }});
+                document.getElementById("like_button").addEventListener("click", function() {{
+                    const message = "{result}";
+                    let likedMessages = JSON.parse(localStorage.getItem("liked_messages") || "[]");
+                    if (!likedMessages.includes(message)) {{
+                        likedMessages.push(message);
+                        localStorage.setItem("liked_messages", JSON.stringify(likedMessages));
+                        alert("Message liked!");
+                    }}
+                }});
+                </script>
+            """, unsafe_allow_html=True)
+
+            # Play response audio if "Read Aloud" button is clicked
+            if st.button("🔊", key="play_audio"):
+                play_audio(result, lang=detected_language)
+
         except Exception as e:
             st.error(f"Error: {e}")
+
+    # Display liked messages
+    st.markdown(
+        """
+        <div id="liked_messages" style="display:none;">
+            <h3>Liked Messages:</h3>
+            <div id="liked_messages_list"></div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+    st.write("""
+        <script>
+        document.querySelector("button[title='Likes']").addEventListener("click", function() {
+            const likedMessages = JSON.parse(localStorage.getItem("liked_messages") || "[]");
+            const likedMessagesList = document.getElementById("liked_messages_list");
+            likedMessagesList.innerHTML = likedMessages.map(message => `<p>${message}</p>`).join("");
+        });
+        </script>
+    """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
